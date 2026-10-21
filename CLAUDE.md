@@ -1,114 +1,87 @@
-# Kite — project notes for Claude Code
+# GetPeptides Community — project notes for Claude Code
 
-Closed-tenant, invite-only enterprise PM/accountability platform. Owner is a
-beginner building from a phone — keep explanations simple and step-by-step,
-and never assume a local terminal is available.
+A Quora-style community forum for **GetPeptides.store**. It was built by copying
+the "Kite" PM platform and reworking it, so a lot of the original
+project-management code still exists but is **no longer part of the product**
+(see "Legacy" below). The owner is a beginner working from a phone — keep
+explanations simple and step-by-step, and never assume a local terminal.
 
 ## Stack & constraints
 - Next.js App Router + TypeScript + Tailwind v4, deployed on Vercel (free tier).
-- Firebase client SDK only: Auth (email/password under the hood — people sign
-  in with a USERNAME, see Security model), Firestore, Storage.
-  NO Cloud Functions / Admin SDK (requires paid plan) — admin operations run
-  client-side and are enforced by `firestore.rules` / `storage.rules`.
-- All Firebase pages are client components; `src/lib/firebase.ts` guards
-  missing env vars so `next build` passes without configuration.
+- Firebase client SDK only: Auth (email/password under the hood — people sign in
+  with a USERNAME), Firestore, Storage. NO Cloud Functions / Admin SDK (paid) —
+  everything runs client-side and is enforced by `firestore.rules` /
+  `storage.rules`.
+- All Firebase pages are client components; `src/lib/firebase.ts` guards missing
+  env vars so `next build` passes without configuration.
+- **English only.** `src/lib/i18n/` now ships a single dictionary (`en.ts`)
+  behind the `t()` API (`useT()`); the multi-language machinery was removed but
+  the call sites are unchanged, so add every new UI string as a key in `en.ts`.
+- **Theme:** GetPeptides emerald/teal. Colours are CSS variables in
+  `src/app/globals.css` (`--brand`, `--brand-soft`, light + dark) — restyle
+  there, don't hard-code colours.
 
-## Domain model (important)
-- **Milestones are per-MEMBER, not per-room.** Every project manager runs
-  their own individual project. `milestones/{id}.ownerUid` is the owner;
-  `roomId` is optional grouping context only.
-- **Rooms group people whose projects are similar in scope** — they are not
-  the unit of work and confer no ownership.
-- A member reads only milestones where `ownerUid == their uid`, never a
-  roommate's progress, blockers or funding. Client queries must be scoped
-  accordingly (Firestore rules are not filters — an unscoped query fails).
-- Per-member funding tags (`users/{uid}.funded/fundedAmount`) are separate
-  from per-milestone funding (`fundedAmount`/`spentAmount`).
-- A member may type in the confirmation code they were given
-  (`users/{uid}.fundingCode`). It is **recorded, never verified** — it grants
-  nothing, and the funding figure itself stays admin-controlled.
-- `users/{uid}.bank*` (bankName / bankWebsite / bankLogin / bankPassword) are
-  filled in by an Admin for that member. Admin-write only; readable by that
-  member and Admins. The password is stored as typed — the most sensitive data
-  in the app. Never log it; `setBankDetails` logs metadata only.
-- `users/{uid}.dashboardMessage` is an admin-written note pinned to that
-  member's own dashboard.
-- **Milestones are NEVER shown in rooms.** Members see their own milestones,
-  countdowns and admin alerts on their own dashboard (the Profile tab).
-- **Project features are for `role === "member"` only.** Staff Handles are
-  operator accounts run by the SuperAdmin — no milestones, no funding tags,
-  no alerts, no dashboard sections. Admins manage rather than deliver.
-- Admins push timing nudges via `alerts/{id}` (targetUid, message,
-  optional milestoneId); the recipient may only flip `read`/`readAt`.
+## What the app is (the active surface)
+- **Community feed** — `src/app/(app)/noticeboard/page.tsx`, collection
+  `broadcast`. A Quora-style feed:
+  - Posts carry `title`, `text`, optional `groupId`/`groupName`, and an optional
+    image shown from an EXTERNAL URL (`mediaUrl` + `mediaType:"image"` — members
+    can't upload to Storage, so pictures are links).
+  - Only **admins / superadmins** post (plus Staff Handles via the Handle
+    Console).
+  - Anyone active **reacts** (one emoji each, `reactions` map) and **comments**
+    (`broadcast/{id}/comments` — any active user writes their own; author or
+    admin deletes; no edits). See `src/components/PostComments.tsx`.
+- **Topic groups** — collection `groups` (Quora-style spaces). Admins manage
+  them on **`/admin/groups`**; the composer files a post under one and the feed
+  shows a filter chip row (filtered in JS — see the index rule below).
+- **Accounts** — public **self-signup** at `/signup` creates a `member`; the
+  Account tab (`src/components/AccountSettings.tsx`) edits handle / username /
+  email / password.
+- **Personas = Staff Handles — DO NOT TOUCH.** Operator accounts
+  (`role:"staff"`, no login) run by the SuperAdmin from the Handle Console
+  (`/admin/console`) via `src/lib/handleActions.ts` (`actingAsStaff`). They are
+  the consultants; their creation and usage must stay intact.
+- **Admin panel** — Users (account minting), Topic groups, and (superadmin)
+  Console + Staff. Bottom nav is just **Community + Account**.
 
 ## Security model (do not weaken)
 - Roles in `users/{uid}.role`: member | staff | admin | superadmin.
-- No self-registration. Member/admin accounts minted by admins via a secondary
-  Firebase app instance (`src/lib/adminActions.ts`).
 - **Sign-in is username + password.** New accounts get a random hidden Auth
-  email (`newLoginEmail` in `src/lib/usernames.ts`) that never changes;
-  `usernames/{name}` → `{uid, loginEmail}` is world-gettable (never listable)
-  so the login screen can resolve it. Uniqueness comes from create-only docs;
-  a user claims/frees names in one batch with `users/{uid}.username`
-  (checked with `getAfter`). `users/{uid}.email` is self-editable contact
-  info only. Input containing `@` signs in as an email (legacy accounts).
-- **Staff Handles have NO Auth account** — no email, no password, they never
-  sign in. They are `users/{autoId}` docs with `role: "staff"`.
-- **There is no "acting as" mode.** The normal app always authors as the
-  signed-in user. Handles are operated ONLY from the Handle Console
-  (`/admin/console`) via `src/lib/handleActions.ts`, which passes the handle
-  explicitly as the author. Rules permit this through `actingAsStaff(uid)`
-  (superadmin + target role == staff).
-- Members must never see: the user directory, room participant lists
-  (`rooms/{id}/acl/members` is admin-only; members read only their own
-  `users/{uid}/memberships`), or other users' form submissions.
-- Standard members can never upload photos/videos anywhere (storage.rules).
-- **Noticeboard** (`broadcast/*`) is the single public channel: admins post,
-  everyone else may only write their own key in the post's `reactions` map
-  (validated in rules). Admins may also edit/pin posts and edit room messages.
-- Members get ONE reaction each (`reactions`: uid -> emoji). Staff Handles
-  stack instead (`handleReactions`: handleUid -> emoji -> count, incremented
-  per tap from the console). `tallyReactions` sums both; the member rule's
-  `hasOnly(['reactions'])` keeps members out of the stacked counters.
+  email (`newLoginEmail` in `src/lib/usernames.ts`); `usernames/{name}` →
+  `{uid, loginEmail}` is world-gettable (never listable) so the login screen
+  resolves it. Input containing `@` signs in as an email (the bootstrap
+  superadmin and any legacy accounts).
+- **Self-signup** (`signUpMember` in `usernames.ts`): creates the Auth account,
+  then batch-writes `users/{uid}` (role forced to `member`, `active:true`, only
+  the whitelisted fields) and claims `usernames/{name}`, using the mutual
+  `getAfter` pattern (users doc ↔ usernames doc). The create rules must never
+  let this path grant a privileged role, funding or bank fields.
+- Admin/superadmin accounts are still minted by admins (`adminActions.ts`, a
+  secondary Firebase app). The **first superadmin is seeded by hand** (SETUP.md).
+- **Staff Handles have NO Auth account**; operated ONLY from the Handle Console
+  via `actingAsStaff(uid)` (superadmin + target role == staff).
+- `status/admins` (uids, world-readable to signed-in users) publishes who is an
+  admin; `AdminTag` renders from it; admins self-heal into it on sign-in.
+- Collections: `broadcast` posts are created by admins/handles, members may only
+  change their own key in `reactions`; `broadcast/*/comments` — any active user
+  creates their own, author or admin deletes; `groups` — read by active users,
+  write by admins.
 - **Never write a Firestore query that filters on one field and sorts by
-  another** — it needs a composite index, and without one the listener fails
-  silently (this caused DMs to look undelivered). Filter in the query, sort in
-  JavaScript.
-- Presence is anonymous: `presence/{uid}` holds a timestamp plus the id of the
-  room being viewed (nothing else). Outside a room the counter adds
-  `status/staff.onCallCount`; inside a room it counts only presence docs with
-  that `roomId` plus `rooms/{id}.onCallStaffCount` — handles that are active,
-  On-Call AND in that room's ACL. `recountRoomOnCall` recomputes that figure
-  from scratch (never increments) on membership/on-call/ban/delete.
-- DM thread ids are the two sorted uids joined by `_`, enforced in rules.
-- Members cannot read other profiles, so `status/admins` (uids only, world-
-  readable to signed-in users) publishes who is an admin; `AdminTag` renders
-  the chip from it. Admins self-heal into that list on sign-in, and
-  `syncAdminRoster` keeps it current on create/role-change/delete.
+  another** — it needs a composite index and fails silently without one. Filter
+  in the query or in JS, sort in JS. (The feed loads newest-first and filters by
+  group in JS for exactly this reason.)
+- Presence is anonymous: `presence/{uid}` = a timestamp (+ a legacy `roomId`).
+
+## Legacy (present in the repo, NOT part of the product)
+The original Kite PM features still exist in code but are **unlinked from the
+nav and dormant**: rooms, milestones, funding, bank details, forms, compliance
+logs, reports, admin alerts, and member-to-member DMs. DMs are still wired into
+`UserBadge` (tap a handle) and the Handle Console inbox, so they weren't
+deleted. Don't build on these. To remove them fully, delete the routes under
+`src/app/(app)/rooms`, `src/app/(app)/messages`, and
+`src/app/(app)/admin/{milestones,alerts,reports,rooms,forms,logs,dashboard}`,
+their components, and the matching `firestore.rules` blocks.
 
 ## Verify before pushing
 `npm run lint && npm run build`
-
-## Language
-**The whole app is translated** (en/fr/es/pt/ar) — member screens, the Admin
-Panel and the Handle Console alike. Dictionaries live in `src/lib/i18n/`
-(`en.ts` is the source of truth; `index.ts` holds the machinery).
-`LanguageProvider` follows `navigator.languages`, flips `<html dir>` for Arabic,
-and honours an override anyone can set from their dashboard.
-
-- Add a key to `en.ts` first: the other four are typed
-  `Record<TranslationKey, string>`, so a missing translation fails the build.
-- Interpolate with `t("key", { name })` against `{name}` in the text — never
-  concatenate sentence fragments, since word order differs per language.
-- Text that pairs with an icon or colour (roles, milestone statuses, log
-  categories, form field types) keeps only its icon/colour in `types.ts` and
-  carries a translation KEY: see `ROLE_KEYS`, `MILESTONE_STATUS_KEYS`,
-  `FORM_FIELD_TYPES[].labelKey`, and `CATEGORY_META` in the logs page.
-- The language is read through `useSyncExternalStore`, so the server renders
-  English and the browser swaps on hydration — do not "fix" this with
-  `setState` in an effect (`react-hooks/set-state-in-effect` fails the lint).
-
-## Roadmap
-Phase 2: room-embedded forms + digital signatures (rules stubs exist under
-`rooms/{id}/submissions`), centralized staff master inbox, compliance logs.
-Phase 3: push notifications, offline queue, milestone dashboards.
