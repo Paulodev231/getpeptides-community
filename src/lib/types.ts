@@ -100,12 +100,23 @@ export function fundingBadge(profile: { funded?: boolean }): {
  * `reactions` maps a uid to the one emoji that person chose, so each member
  * gets exactly one reaction per post and can change or clear it.
  */
+/** A topic group (like a Quora Space) that posts can be filed under. */
+export interface TopicGroup {
+  id: string;
+  name: string;
+  createdBy: string;
+  createdAt?: Timestamp;
+}
+
 export interface BroadcastPost {
   id: string;
   authorUid: string;
   authorHandle: string;
   /** Quora-style topic/question headline. Optional for older posts. */
   title?: string;
+  /** Topic group this post belongs to (optional). */
+  groupId?: string;
+  groupName?: string;
   text: string;
   mediaUrl?: string;
   mediaType?: "image" | "video" | "file";

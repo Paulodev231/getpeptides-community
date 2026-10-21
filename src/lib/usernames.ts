@@ -9,8 +9,9 @@
 //
 // Older accounts made with a real email keep working: anything typed with an
 // "@" on the sign-in screen is used as an email directly.
-import { collection, doc, getDoc, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { collection, doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { db, firebaseAuth } from "@/lib/firebase";
 
 /** Same pattern as `usernames/{name}` in firestore.rules. */
 const USERNAME_RE = /^[a-z0-9._-]{3,24}$/;
@@ -60,6 +61,51 @@ function loginDomain(): string {
 export function newLoginEmail(): string {
   const id = doc(collection(db(), "usernames")).id.toLowerCase();
   return `u-${id}@${loginDomain()}`;
+}
+
+/**
+ * Public self-signup. Creates the Firebase Auth account (on a hidden login
+ * address behind the chosen username), then writes the member profile and
+ * claims the username in one atomic batch. Throws "handle-invalid",
+ * "username-invalid", "password-weak" or "username-taken"; if the profile
+ * write is rejected, the just-created Auth account is removed so nothing is
+ * left orphaned.
+ */
+export async function signUpMember(
+  rawHandle: string,
+  rawUsername: string,
+  password: string,
+  rawEmail?: string,
+) {
+  const handle = rawHandle.trim();
+  const name = normalizeUsername(rawUsername);
+  const email = rawEmail?.trim();
+  if (handle.length < 2 || handle.length > 24) throw new Error("handle-invalid");
+  if (!isValidUsername(name)) throw new Error("username-invalid");
+  if (password.length < 6) throw new Error("password-weak");
+  if (await isUsernameTaken(name)) throw new Error("username-taken");
+
+  const loginEmail = newLoginEmail();
+  const cred = await createUserWithEmailAndPassword(firebaseAuth(), loginEmail, password);
+  const uid = cred.user.uid;
+  try {
+    const batch = writeBatch(db());
+    batch.set(doc(db(), "users", uid), {
+      handle,
+      username: name,
+      role: "member",
+      active: true,
+      ...(email ? { email } : {}),
+      createdAt: serverTimestamp(),
+    });
+    batch.set(doc(db(), "usernames", name), { uid, loginEmail });
+    await batch.commit();
+  } catch (err) {
+    // The profile write was rejected — don't leave a sign-in-able account with
+    // no profile. Remove the Auth user we just created.
+    await cred.user.delete().catch(() => {});
+    throw err;
+  }
 }
 
 /**

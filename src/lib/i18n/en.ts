@@ -17,9 +17,21 @@ export const en = {
   password: "Password",
   signIn: "Sign In",
   signingIn: "Signing in…",
-  signInFailed: "Sign-in failed. Check the username and password given to you by your Admin.",
-  noAccount:
-    "No account? Access to this platform is provisioned by your administrator. Contact them for credentials.",
+  signInFailed: "Sign-in failed. Check your username and password.",
+  noAccount: "New here?",
+
+  // sign up (public self-registration)
+  signUpTitle: "Join the community",
+  signUpSubtitle: "Create a free account to post, comment and react.",
+  displayName: "Display name",
+  createAccount: "Create account",
+  creatingAccount: "Creating account…",
+  haveAccount: "Already have an account?",
+  signUpCta: "Create an account",
+  signUpFailed: "Could not create your account. Please try again.",
+  optional: "optional",
+  handleInvalid: "❌ Display name must be 2–24 characters.",
+  passwordWeak: "❌ Password must be at least 6 characters.",
 
   // noticeboard / community feed
   noticeboard: "Community",
@@ -42,6 +54,14 @@ export const en = {
   qViewComments: "View {n} comments",
   qHideComments: "Hide comments",
   qDeleteComment: "Delete this comment?",
+  // topic groups
+  groupsAll: "All",
+  groupChoose: "Topic group (optional)",
+  groupNone: "No group",
+  groupManage: "Topic groups",
+  groupNewName: "New topic group…",
+  groupAdd: "Add",
+  groupDelete: "Delete this topic group? Existing posts keep their label.",
 
   // rooms
   rooms: "Project Rooms",

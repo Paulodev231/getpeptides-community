@@ -1,9 +1,10 @@
 "use client";
 
-// Invite-only sign in. There is deliberately NO "create account" option:
-// accounts exist only when an Admin creates them from the Admin Panel.
+// Sign in. Anyone can create a free account from here; Admin accounts are
+// still minted from the Admin Panel.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase";
 import { loginEmailFor, normalizeUsername } from "@/lib/usernames";
@@ -107,8 +108,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-[11px] leading-relaxed opacity-50">
-          {t("noAccount")}
+        <p className="mt-6 text-center text-xs opacity-70">
+          {t("noAccount")}{" "}
+          <Link href="/signup" className="font-bold text-brand">
+            {t("signUpCta")}
+          </Link>
         </p>
       </div>
     </div>

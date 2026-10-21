@@ -50,11 +50,25 @@ service cloud.firestore {
     match /users/{uid} {
       // You may read only YOUR OWN profile; Admins see the full directory.
       allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
-      // Accounts are minted by Admins only (invite-only platform).
-      // Only SuperAdmin can mint privileged roles, and nobody self-registers.
-      allow create: if isAdmin()
-        && request.resource.data.role in ['member', 'staff', 'admin']
-        && (request.resource.data.role == 'member' || isSuper());
+      // Two ways an account document is created:
+      //  1. An Admin mints it (members, staff handles; SuperAdmin for admins).
+      //  2. Public self-signup — a brand-new signed-in user creates their OWN
+      //     member profile, claiming their username in the same batch. They may
+      //     set only the listed fields, role MUST be 'member' and active MUST be
+      //     true, so nobody can self-grant a privileged role, funding or bank.
+      allow create: if (isAdmin()
+          && request.resource.data.role in ['member', 'staff', 'admin']
+          && (request.resource.data.role == 'member' || isSuper()))
+        || (signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(
+               ['handle', 'username', 'role', 'active', 'email', 'createdAt'])
+          && request.resource.data.role == 'member'
+          && request.resource.data.active == true
+          && request.resource.data.handle is string
+          && request.resource.data.handle.size() >= 2
+          && request.resource.data.handle.size() <= 24
+          && request.resource.data.username is string
+          && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == request.auth.uid);
       // Three ways a user document can change:
       //  1. SuperAdmin — unrestricted, including other SuperAdmins and self.
       //  2. Standard Admin — any member/staff/admin record, but may not touch
@@ -121,7 +135,13 @@ service cloud.firestore {
           // and only while setting it on your profile in the same write.
           || (isActive() && request.resource.data.uid == request.auth.uid
             && request.resource.data.loginEmail == request.auth.token.email
-            && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == name));
+            && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == name)
+          // Public self-signup: a brand-new (not-yet-active) user claims their
+          // name while creating their own MEMBER profile in the same batch.
+          || (signedIn() && request.resource.data.uid == request.auth.uid
+            && request.resource.data.loginEmail == request.auth.token.email
+            && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == name
+            && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'member'));
       allow update: if false;
       // Freeing your old name is only allowed once your profile has moved on.
       allow delete: if isAdmin()
@@ -193,6 +213,13 @@ service cloud.firestore {
         allow delete: if isAdmin()
           || (isActive() && resource.data.authorUid == request.auth.uid);
       }
+    }
+
+    // ---------- topic groups (Quora-style spaces) ----------
+    // Anyone active can read the list to browse/filter; only Admins manage them.
+    match /groups/{groupId} {
+      allow read: if isActive();
+      allow create, update, delete: if isAdmin();
     }
 
     // ---------- Admin-locked private rooms ----------
