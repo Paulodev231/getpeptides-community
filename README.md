@@ -1,72 +1,74 @@
-# 🪁 Kite — Enterprise Project Ops Hub
+# 🧪 GetPeptides Community
 
-A closed-tenant, invite-only **Project Management, Accountability & Community
-Support** platform that installs and behaves like a native mobile app (PWA).
+A **Quora-style community forum** for GetPeptides.store that installs and
+behaves like a native mobile app (PWA). Admins (and consultant "personas")
+post topics with optional image links under topic groups; members sign
+themselves up, comment and react.
 
-**Stack:** Next.js (App Router) + React + TailwindCSS on **Vercel** ·
-**Firebase** (Authentication, Cloud Firestore real-time data, Storage).
-100% free-tier.
+**Stack:** Next.js (App Router) + React + Tailwind v4 on **Vercel** ·
+**Firebase** (Authentication, Cloud Firestore, Storage). 100% free-tier.
+English only.
 
 > 🚀 **New here? Open [`SETUP.md`](./SETUP.md)** — a phone-friendly,
 > step-by-step guide from zero to a live installed app.
 
-## What's built (Phase 1)
+## What it does
 
 | Area | Status |
 |---|---|
-| Native-feel PWA shell (bottom nav, drawer, transitions, installable) | ✅ |
-| Invite-only auth — no public sign-up, Admin-minted accounts | ✅ |
-| 📢 Main Broadcast Channel — read-only, Admin-posted media | ✅ |
-| 🫶 General Community Room — emoji reactions ONLY | ✅ |
-| 🔐 Admin-locked private rooms with member toggle panel | ✅ |
-| Hidden directories & hidden participant lists for members | ✅ |
-| ⚡ Anonymous "Active Now" presence counter | ✅ |
-| 💬 One-touch DMs (tap any handle/avatar) — docs only for members | ✅ |
-| 🎧 Managed Staff Handles + real-time On-Call presence control | ✅ |
+| Quora-style community feed — admins/superadmins post topics | ✅ |
+| Topic = title + body + optional image via an EXTERNAL LINK | ✅ |
+| Topic groups (spaces) + filter bar — managed at `/admin/groups` | ✅ |
+| Comments under every post (any signed-in member) | ✅ |
+| One-emoji reactions per person (+ stacked persona reactions) | ✅ |
+| Public **self-signup** (`/signup`) — members create their own account | ✅ |
+| Username + password sign-in (hidden email under the hood) | ✅ |
+| Account dashboard — edit display name, username, email, password | ✅ |
+| Consultant **personas** = Staff Handles via the Handle Console | ✅ |
+| Admin panel — accounts, topic groups, console, staff | ✅ |
 | Role hierarchy: member / staff / admin / superadmin | ✅ |
+| GetPeptides emerald/teal theme (light + dark) | ✅ |
 | Firestore + Storage security rules enforcing all of the above | ✅ |
-| 📋 Room-embedded forms & ✍️ digital signatures (private submissions) | ✅ Phase 2 |
-| 📥 Centralized Staff master inbox — 🔴 badges, reply-as-handle | ✅ Phase 2 |
-| 🧾 Append-only compliance & event logs | ✅ Phase 2 |
-| 📝 Self-service handle & password changes (Admin-notified) | ✅ Phase 3a |
-| ⛔ Ban/unban, 🗑️ delete users, 🧹 delete posts & messages | ✅ Phase 3a |
-| 🔔 Unread badges + device notifications (app open/background) | ✅ Phase 3b |
-| 📴 Offline reading & queued sending (Firestore on-device cache) | ✅ Phase 3b |
-| 🎯 Per-member milestones, hindrance logging, committed vs released funding | ✅ Phase 3b |
-| 📊 Admin dashboard: completion, blockers, funding, per-room roll-up | ✅ Phase 3b |
-| ⏰ Due-date reminders + 🚩 "Needs attention" working list | ✅ Phase 4 |
-| ⬇️ CSV export: milestones, form responses, full room reports | ✅ Phase 4 |
-| 📑 Per-room reports incl. form response rates | ✅ Phase 4 |
-| 💰 Per-member funding tags (Funded / Not funded + amount) | ✅ Phase 4 |
-| 📊 Member dashboard: own milestones with countdowns, funding, alerts | ✅ Phase 4 |
-| 🔔 Admin-written timing alerts to a member (auto-filled countdown) | ✅ Phase 4 |
-| 🔎 Admin full-profile view (email, project, alerts, rooms) + one-touch DM | ✅ Phase 4 |
+| Native-feel installable PWA (bottom nav, drawer, transitions) | ✅ |
 
 ## Project map
 
 ```
 src/
   app/
-    login/              Invite-only sign-in
+    login/              Username / password sign-in
+    signup/             Public self-registration
     (app)/              Everything behind auth
-      broadcast/        Main Broadcast Channel
-      community/        Emoji-only community room
-      rooms/ + [id]/    Private rooms list & chat
-      messages/         DM inbox & one-touch threads
-      profile/          Own profile & sign-out
-      admin/            Admin Panel (users, rooms, staff handles)
-  components/           App shell, composer, presence counter…
-  context/AuthContext   Session, role, presence heartbeat
-  lib/                  Firebase init, types, admin actions, uploads
+      noticeboard/      The community feed (collection: broadcast)
+      profile/          Account settings (handle / username / email / password)
+      admin/            Admin panel
+        groups/         Topic-group management
+        users/          Account minting
+        console/        Handle Console (personas) — superadmin
+        staff/          Staff handles — superadmin
+  components/           App shell, PostComments, media, user badge…
+  context/AuthContext   Session, role, presence
+  lib/                  firebase, types, usernames (incl. signUpMember), handleActions…
+  lib/i18n/en.ts        All UI text (English only)
 firestore.rules         THE security model — paste into Firebase
 storage.rules           Media permissions — paste into Firebase
-SETUP.md                Foolproof deployment guide
+SETUP.md                Phone-friendly deployment guide
 ```
+
+> The repo also contains **dormant project-management code** from the original
+> "Kite" template (rooms, milestones, funding, forms, logs, DMs). It is
+> unlinked from the app — see [`CLAUDE.md`](./CLAUDE.md) → "Legacy".
 
 ## Local development
 
+Set your Firebase web config as `NEXT_PUBLIC_FIREBASE_*` environment variables
+(in `.env.local` locally, or in Vercel — see `SETUP.md`), then:
+
 ```bash
-cp .env.local.example .env.local   # fill in your Firebase keys
 npm install
 npm run dev
 ```
+
+`src/lib/firebase.ts` guards missing keys, so `npm run build` succeeds even
+without configuration (the app just shows a "connect Firebase" screen until the
+keys are set).
