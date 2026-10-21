@@ -58,6 +58,13 @@ export default function AdminHome() {
       desc: t("admUsersDesc"),
       badge: 0,
     },
+    {
+      href: "/admin/groups",
+      icon: "🗂️",
+      title: t("admGroups"),
+      desc: t("admGroupsDesc"),
+      badge: 0,
+    },
     ...(superadmin
       ? [
           {

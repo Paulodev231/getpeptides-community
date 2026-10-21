@@ -62,6 +62,9 @@ export const en = {
   groupNewName: "New topic group…",
   groupAdd: "Add",
   groupDelete: "Delete this topic group? Existing posts keep their label.",
+  groupEmpty: "No topic groups yet. Add one above.",
+  admGroups: "Topic groups",
+  admGroupsDesc: "Create and remove the topics people can post under",
 
   // rooms
   rooms: "Project Rooms",

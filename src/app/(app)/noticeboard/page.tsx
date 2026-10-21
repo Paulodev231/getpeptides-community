@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import {
   addDoc,
   collection,
-  deleteDoc,
   deleteField,
   doc,
   limit,
@@ -41,10 +40,9 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<BroadcastPost[]>([]);
   const admin = isAdmin(profile?.role);
 
-  // Topic groups
+  // Topic groups (managed by admins on /admin/groups)
   const [groups, setGroups] = useState<TopicGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [newGroupName, setNewGroupName] = useState("");
 
   // Admin composer
   const [title, setTitle] = useState("");
@@ -79,24 +77,6 @@ export default function CommunityPage() {
   useEffect(() => {
     if (posts.length > 0) markSeen(seenKeys.broadcast);
   }, [posts]);
-
-  async function addGroup() {
-    const name = newGroupName.trim();
-    if (!name || !user) return;
-    await addDoc(collection(db(), "groups"), {
-      name,
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-    }).catch(() => {});
-    setNewGroupName("");
-  }
-
-  async function removeGroup(g: TopicGroup) {
-    if (!window.confirm(t("groupDelete"))) return;
-    await deleteDoc(doc(db(), "groups", g.id)).catch(() => {});
-    if (selectedGroup === g.id) setSelectedGroup(null);
-    if (groupId === g.id) setGroupId("");
-  }
 
   async function createPost() {
     if (!user || !profile || posting) return;
@@ -172,47 +152,6 @@ export default function CommunityPage() {
         {/* Admin / SuperAdmin composer */}
         {admin && (
           <div className="border-b border-black/5 bg-surface p-3 dark:border-white/10">
-            {/* Manage topic groups */}
-            <div className="mb-2">
-              <p className="mb-1 text-[11px] font-semibold opacity-50">{t("groupManage")}</p>
-              {groups.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {groups.map((g) => (
-                    <span
-                      key={g.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand"
-                    >
-                      {g.name}
-                      <button
-                        type="button"
-                        aria-label="remove"
-                        onClick={() => removeGroup(g)}
-                        className="opacity-60"
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div className="mt-1.5 flex gap-2">
-                <input
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder={t("groupNewName")}
-                  className="flex-1 rounded-xl border border-black/10 bg-background px-3 py-2 text-sm outline-none focus:border-brand dark:border-white/10"
-                />
-                <button
-                  type="button"
-                  onClick={addGroup}
-                  disabled={!newGroupName.trim()}
-                  className="rounded-xl bg-background px-3 py-2 text-xs font-bold disabled:opacity-40"
-                >
-                  {t("groupAdd")}
-                </button>
-              </div>
-            </div>
-
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
