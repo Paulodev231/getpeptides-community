@@ -49,54 +49,13 @@ export default function AdminHome() {
     };
   }, [superadmin]);
 
+  // Community app: only account + persona (Staff Handle) management remains.
   const items = [
-    {
-      href: "/admin/dashboard",
-      icon: "📊",
-      title: t("admDashboard"),
-      desc: t("admDashboardDesc"),
-      badge: 0,
-    },
-    {
-      href: "/admin/milestones",
-      icon: "🎯",
-      title: t("admMilestones"),
-      desc: t("admMilestonesDesc"),
-      badge: 0,
-    },
-    {
-      href: "/admin/alerts",
-      icon: "🔔",
-      title: t("admAlerts"),
-      desc: t("admAlertsDesc"),
-      badge: 0,
-    },
-    {
-      href: "/admin/reports",
-      icon: "📑",
-      title: t("admReports"),
-      desc: t("admReportsDesc"),
-      badge: 0,
-    },
     {
       href: "/admin/users",
       icon: "👥",
       title: t("admUsers"),
       desc: t("admUsersDesc"),
-      badge: 0,
-    },
-    {
-      href: "/admin/rooms",
-      icon: "🔐",
-      title: t("admRooms"),
-      desc: t("admRoomsDesc"),
-      badge: 0,
-    },
-    {
-      href: "/admin/forms",
-      icon: "📋",
-      title: t("admForms"),
-      desc: t("admFormsDesc"),
       badge: 0,
     },
     ...(superadmin
@@ -117,13 +76,6 @@ export default function AdminHome() {
           },
         ]
       : []),
-    {
-      href: "/admin/logs",
-      icon: "🧾",
-      title: t("admLogs"),
-      desc: t("admLogsDesc"),
-      badge: 0,
-    },
   ];
 
   return (

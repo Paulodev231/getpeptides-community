@@ -13,10 +13,8 @@ import PresenceCounter from "@/components/PresenceCounter";
 import OfflineBanner from "@/components/OfflineBanner";
 
 const TABS = [
-  { href: "/noticeboard", key: "navNoticeboard", icon: "📣" },
-  { href: "/rooms", key: "navRooms", icon: "🗂️" },
-  { href: "/messages", key: "navDms", icon: "💬" },
-  { href: "/profile", key: "navDashboard", icon: "📊" },
+  { href: "/noticeboard", key: "navNoticeboard", icon: "🏠" },
+  { href: "/profile", key: "navDashboard", icon: "👤" },
 ] as const;
 
 export default function AppShell({
@@ -31,18 +29,9 @@ export default function AppShell({
   const router = useRouter();
   const { profile, logout } = useAuth();
   const { t } = useT();
-  const { dmUnread, broadcastUnread, alertUnread } = useNotifications();
+  const { broadcastUnread } = useNotifications();
   const admin = isAdmin(profile?.role);
-  // /rooms/<id> → that room's own live count in the header.
-  const roomId = pathname.startsWith("/rooms/") ? pathname.split("/")[2] : undefined;
-  const badgeFor = (href: string) =>
-    href === "/messages"
-      ? dmUnread
-      : href === "/noticeboard"
-        ? broadcastUnread
-        : href === "/profile"
-          ? alertUnread
-          : 0;
+  const badgeFor = (href: string) => (href === "/noticeboard" ? broadcastUnread : 0);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
@@ -58,8 +47,7 @@ export default function AppShell({
             ☰
           </button>
           <h1 className="flex-1 truncate text-base font-bold">{title}</h1>
-          {/* Inside a room the counter is scoped to that room */}
-          <PresenceCounter roomId={roomId} />
+          <PresenceCounter />
         </div>
       </header>
 

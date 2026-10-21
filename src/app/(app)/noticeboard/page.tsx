@@ -1,9 +1,8 @@
 "use client";
 
-// 📣 Noticeboard — the single public channel. Admins (and Staff Handles, via
-// the Handle Console) post here; everyone else responds with ONE emoji per
-// post. There is no text replying by design: this is a broadcast channel with
-// acknowledgement, not a chat room.
+// 🏠 Community — a Quora-style feed. Admins / SuperAdmins (and Staff Handles
+// via the Handle Console) post topics with an optional image link; everyone
+// active can react with an emoji and comment underneath.
 import { useEffect, useState } from "react";
 import {
   addDoc,
@@ -26,22 +25,34 @@ import {
   tallyReactions,
   type BroadcastPost,
 } from "@/lib/types";
-import { uploadFile } from "@/lib/upload";
 import { logEvent } from "@/lib/log";
-import { deleteBroadcastPost, setPostPinned, editPostText } from "@/lib/adminActions";
+import { deleteBroadcastPost, setPostPinned } from "@/lib/adminActions";
 import { markSeen, seenKeys } from "@/lib/seen";
 import AppShell from "@/components/AppShell";
-import Composer from "@/components/Composer";
 import MediaAttachment from "@/components/MediaAttachment";
 import UserBadge from "@/components/UserBadge";
+import PostComments from "@/components/PostComments";
 
-export default function NoticeboardPage() {
+export default function CommunityPage() {
   const { user, profile } = useAuth();
   const { t } = useT();
   const [posts, setPosts] = useState<BroadcastPost[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
   const admin = isAdmin(profile?.role);
+
+  // Admin composer
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  // Admin edit
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [eTitle, setETitle] = useState("");
+  const [eBody, setEBody] = useState("");
+  const [eImage, setEImage] = useState("");
+
+  // Which posts have their comment thread open
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const q = query(collection(db(), "broadcast"), orderBy("createdAt", "desc"), limit(60));
@@ -54,19 +65,50 @@ export default function NoticeboardPage() {
     if (posts.length > 0) markSeen(seenKeys.broadcast);
   }, [posts]);
 
-  async function post(text: string, file: File | null) {
-    if (!user || !profile) return;
-    const media = file ? await uploadFile("broadcast", file) : null;
-    await addDoc(collection(db(), "broadcast"), {
-      authorUid: user.uid,
-      authorHandle: profile.handle,
-      text,
-      reactions: {},
-      pinned: false,
-      ...(media ? { mediaUrl: media.url, mediaType: media.kind, mediaName: media.name } : {}),
-      createdAt: serverTimestamp(),
-    });
-    logEvent(user.uid, "broadcast_post", media ? { media: media.kind } : {});
+  async function createPost() {
+    if (!user || !profile || posting) return;
+    const tt = title.trim();
+    const bb = body.trim();
+    const img = imageUrl.trim();
+    if (!tt && !bb && !img) return;
+    setPosting(true);
+    try {
+      await addDoc(collection(db(), "broadcast"), {
+        authorUid: user.uid,
+        authorHandle: profile.handle,
+        title: tt,
+        text: bb,
+        reactions: {},
+        pinned: false,
+        ...(img ? { mediaUrl: img, mediaType: "image" as const } : {}),
+        createdAt: serverTimestamp(),
+      });
+      logEvent(user.uid, "broadcast_post", img ? { media: "image" } : {});
+      setTitle("");
+      setBody("");
+      setImageUrl("");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  function startEdit(p: BroadcastPost) {
+    setEditingId(p.id);
+    setETitle(p.title ?? "");
+    setEBody(p.text ?? "");
+    setEImage(p.mediaType === "image" && p.mediaUrl ? p.mediaUrl : "");
+  }
+
+  async function saveEdit(id: string) {
+    const img = eImage.trim();
+    await updateDoc(doc(db(), "broadcast", id), {
+      title: eTitle.trim(),
+      text: eBody.trim(),
+      mediaUrl: img ? img : deleteField(),
+      mediaType: img ? "image" : deleteField(),
+      editedAt: serverTimestamp(),
+    }).catch(() => {});
+    setEditingId(null);
   }
 
   /** One reaction per person per post: tapping the same emoji clears it. */
@@ -84,25 +126,60 @@ export default function NoticeboardPage() {
     return (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0);
   });
 
+  const canPost = Boolean(title.trim() || body.trim() || imageUrl.trim());
+
   return (
-    <AppShell title={`📣 ${t("noticeboard")}`}>
+    <AppShell title={`🏠 ${t("noticeboard")}`}>
       <div className="mx-auto flex min-h-full max-w-lg flex-col">
+        {/* Admin / SuperAdmin composer */}
+        {admin && (
+          <div className="border-b border-black/5 bg-surface p-3 dark:border-white/10">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={t("qTitlePlaceholder")}
+              className="w-full rounded-xl border border-black/10 bg-background px-3 py-2.5 text-base font-semibold outline-none focus:border-brand dark:border-white/10"
+            />
+            <textarea
+              rows={2}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={t("qBodyPlaceholder")}
+              className="mt-2 w-full resize-none rounded-xl border border-black/10 bg-background px-3 py-2.5 text-sm outline-none focus:border-brand dark:border-white/10"
+            />
+            <input
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder={t("qImageUrl")}
+              inputMode="url"
+              className="mt-2 w-full rounded-xl border border-black/10 bg-background px-3 py-2 text-sm outline-none focus:border-brand dark:border-white/10"
+            />
+            {imageUrl.trim() && <MediaAttachment url={imageUrl.trim()} type="image" />}
+            <button
+              type="button"
+              onClick={createPost}
+              disabled={posting || !canPost}
+              className="mt-2 w-full rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
+            >
+              {posting ? t("qPosting") : t("qPost")}
+            </button>
+          </div>
+        )}
+
         <div className="flex-1 space-y-3 p-3">
           {ordered.length === 0 && (
-            <p className="pt-16 text-center text-sm opacity-50">
-              {t("noticeboardEmpty")}
-            </p>
+            <p className="pt-16 text-center text-sm opacity-50">{t("noticeboardEmpty")}</p>
           )}
 
           {ordered.map((p) => {
             const mine = user ? p.reactions?.[user.uid] : undefined;
             const tally = tallyReactions(p.reactions, p.handleReactions);
+            const editing = editingId === p.id;
+            const showComments = !!openComments[p.id];
             return (
               <article
                 key={p.id}
-                className={`rounded-2xl bg-surface p-4 shadow-sm ${
-                  p.pinned ? "ring-1 ring-brand" : ""
-                }`}
+                className={`rounded-2xl bg-surface p-4 shadow-sm ${p.pinned ? "ring-1 ring-brand" : ""}`}
               >
                 {p.pinned && (
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-brand">
@@ -118,13 +195,26 @@ export default function NoticeboardPage() {
                   </span>
                 </div>
 
-                {editingId === p.id ? (
+                {editing ? (
                   <div className="space-y-2">
+                    <input
+                      value={eTitle}
+                      onChange={(e) => setETitle(e.target.value)}
+                      placeholder={t("qTitlePlaceholder")}
+                      className="w-full rounded-xl border border-black/10 bg-background px-3 py-2 text-sm font-semibold outline-none focus:border-brand dark:border-white/10"
+                    />
                     <textarea
-                      rows={5}
-                      className="w-full rounded-xl border border-black/10 bg-background px-3 py-2.5 text-sm outline-none focus:border-brand dark:border-white/10"
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
+                      rows={4}
+                      value={eBody}
+                      onChange={(e) => setEBody(e.target.value)}
+                      placeholder={t("qBodyPlaceholder")}
+                      className="w-full resize-none rounded-xl border border-black/10 bg-background px-3 py-2 text-sm outline-none focus:border-brand dark:border-white/10"
+                    />
+                    <input
+                      value={eImage}
+                      onChange={(e) => setEImage(e.target.value)}
+                      placeholder={t("qImageUrl")}
+                      className="w-full rounded-xl border border-black/10 bg-background px-3 py-2 text-sm outline-none focus:border-brand dark:border-white/10"
                     />
                     <div className="flex gap-2">
                       <button
@@ -136,10 +226,7 @@ export default function NoticeboardPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={async () => {
-                          await editPostText(p.id, draft);
-                          setEditingId(null);
-                        }}
+                        onClick={() => saveEdit(p.id)}
                         className="app-chrome flex-1 rounded-xl bg-brand py-2 text-xs font-bold text-white"
                       >
                         {t("saveChanges")}
@@ -148,8 +235,9 @@ export default function NoticeboardPage() {
                   </div>
                 ) : (
                   <>
+                    {p.title && <h2 className="text-lg font-bold leading-snug">{p.title}</h2>}
                     {p.text && (
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{p.text}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{p.text}</p>
                     )}
                     {p.mediaUrl && (
                       <MediaAttachment url={p.mediaUrl} type={p.mediaType} name={p.mediaName} />
@@ -160,20 +248,20 @@ export default function NoticeboardPage() {
                 {/* Reaction tally */}
                 {tally.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {tally.map((t) => (
+                    {tally.map((item) => (
                       <span
-                        key={t.emoji}
+                        key={item.emoji}
                         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          mine === t.emoji ? "bg-brand text-white" : "bg-background"
+                          mine === item.emoji ? "bg-brand text-white" : "bg-background"
                         }`}
                       >
-                        {t.emoji} {t.count}
+                        {item.emoji} {item.count}
                       </span>
                     ))}
                   </div>
                 )}
 
-                {/* Reaction bar — the only way anyone but an admin replies */}
+                {/* Reaction bar */}
                 <div className="mt-2 flex flex-wrap gap-1 border-t border-black/5 pt-2 dark:border-white/10">
                   {REACTION_EMOJIS.map((emoji) => (
                     <button
@@ -190,15 +278,22 @@ export default function NoticeboardPage() {
                   ))}
                 </div>
 
+                {/* Comments */}
+                <button
+                  type="button"
+                  onClick={() => setOpenComments((m) => ({ ...m, [p.id]: !m[p.id] }))}
+                  className="mt-2 text-xs font-semibold text-brand"
+                >
+                  💬 {showComments ? t("qHideComments") : t("qComments")}
+                </button>
+                {showComments && <PostComments postId={p.id} />}
+
                 {/* Admin controls */}
-                {admin && editingId !== p.id && (
+                {admin && !editing && (
                   <div className="mt-2 flex gap-1.5 border-t border-black/5 pt-2 dark:border-white/10">
                     <button
                       type="button"
-                      onClick={() => {
-                        setDraft(p.text ?? "");
-                        setEditingId(p.id);
-                      }}
+                      onClick={() => startEdit(p)}
                       className="app-chrome flex-1 rounded-lg bg-background py-1.5 text-[11px] font-bold"
                     >
                       {t("edit")}
@@ -215,8 +310,7 @@ export default function NoticeboardPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(t("cnDeletePostConfirm")))
-                          deleteBroadcastPost(p.id);
+                        if (window.confirm(t("cnDeletePostConfirm"))) deleteBroadcastPost(p.id);
                       }}
                       className="app-chrome rounded-lg bg-red-500/10 px-3 py-1.5 text-[11px] font-bold text-red-500"
                     >
@@ -228,14 +322,6 @@ export default function NoticeboardPage() {
             );
           })}
         </div>
-
-        {admin ? (
-          <Composer placeholder={t("postAnnouncement")} allowMedia onSend={post} />
-        ) : (
-          <p className="app-chrome border-t border-black/5 bg-surface px-4 py-3 text-center text-[11px] font-medium opacity-50 dark:border-white/10">
-            {t("readOnlyNotice")}
-          </p>
-        )}
       </div>
     </AppShell>
   );

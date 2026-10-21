@@ -104,6 +104,8 @@ export interface BroadcastPost {
   id: string;
   authorUid: string;
   authorHandle: string;
+  /** Quora-style topic/question headline. Optional for older posts. */
+  title?: string;
   text: string;
   mediaUrl?: string;
   mediaType?: "image" | "video" | "file";
@@ -118,7 +120,17 @@ export interface BroadcastPost {
   createdAt?: Timestamp;
 }
 
-/** The only replies members can give on the Noticeboard. */
+/** A comment under a community post. Any signed-in, active user may write one
+ *  (this is the Quora-style public discussion thread). */
+export interface PostComment {
+  id: string;
+  authorUid: string;
+  authorHandle: string;
+  text: string;
+  createdAt?: Timestamp;
+}
+
+/** Quick emoji reactions available on each post. */
 export const REACTION_EMOJIS = ["👍", "🙏", "🔥", "💪", "🎉", "❤️", "👏", "✅"] as const;
 
 /**

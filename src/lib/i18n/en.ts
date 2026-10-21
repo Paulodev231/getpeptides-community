@@ -1,10 +1,10 @@
 // English is the source of truth: every key lives here first.
 export const en = {
   // navigation & chrome
-  navNoticeboard: "Noticeboard",
+  navNoticeboard: "Community",
   navRooms: "Rooms",
   navDms: "DMs",
-  navDashboard: "Dashboard",
+  navDashboard: "Account",
   adminPanel: "Admin Panel",
   signOut: "Sign out",
   activeNow: "Active Now",
@@ -21,13 +21,27 @@ export const en = {
   noAccount:
     "No account? Access to this platform is provisioned by your administrator. Contact them for credentials.",
 
-  // noticeboard
-  noticeboard: "Noticeboard",
+  // noticeboard / community feed
+  noticeboard: "Community",
   noticeboardEmpty:
-    "Announcements will appear here. React with an emoji to let the team know you have seen them.",
+    "No posts yet. Topics and answers from our consultants will appear here.",
   readOnlyNotice: "🔒 Only Admins post here — tap an emoji to respond",
   pinned: "Pinned",
   edited: "edited",
+
+  // community feed (Quora-style posts + comments)
+  qTitlePlaceholder: "Title or question",
+  qBodyPlaceholder: "Add more detail (optional)",
+  qImageUrl: "Image link (https://…) — optional",
+  qPost: "Post",
+  qPosting: "Posting…",
+  qComments: "Comments",
+  qAddComment: "Write a comment…",
+  qSendComment: "Comment",
+  qNoComments: "No comments yet — be the first.",
+  qViewComments: "View {n} comments",
+  qHideComments: "Hide comments",
+  qDeleteComment: "Delete this comment?",
 
   // rooms
   rooms: "Project Rooms",
