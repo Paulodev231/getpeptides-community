@@ -232,7 +232,9 @@ export default function CommunityPage() {
             const mine = user ? p.reactions?.[user.uid] : undefined;
             const tally = tallyReactions(p.reactions, p.handleReactions);
             const editing = editingId === p.id;
-            const showComments = !!openComments[p.id];
+            // Comments are shown by default so everyone sees the discussion;
+            // the toggle only collapses them.
+            const showComments = openComments[p.id] !== false;
             return (
               <article
                 key={p.id}
@@ -343,7 +345,7 @@ export default function CommunityPage() {
                 {/* Comments */}
                 <button
                   type="button"
-                  onClick={() => setOpenComments((m) => ({ ...m, [p.id]: !m[p.id] }))}
+                  onClick={() => setOpenComments((m) => ({ ...m, [p.id]: !showComments }))}
                   className="mt-2 text-xs font-semibold text-brand"
                 >
                   💬 {showComments ? t("qHideComments") : t("qComments")}

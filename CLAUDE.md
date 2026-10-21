@@ -42,8 +42,16 @@ explanations simple and step-by-step, and never assume a local terminal.
   (`role:"staff"`, no login) run by the SuperAdmin from the Handle Console
   (`/admin/console`) via `src/lib/handleActions.ts` (`actingAsStaff`). They are
   the consultants; their creation and usage must stay intact.
+- **Members directory** — `/members` lists everyone (members, admins and the
+  Staff Handle consultants) from the public `directory` collection, so anyone
+  can find and **DM** anyone. The SuperAdmin can promote a member to admin (or
+  step one down) from each row.
+- **Direct Messages** — `/messages` (inbox) + `/messages/with/{uid}` (thread)
+  are a first-class feature. Tapping any handle/avatar anywhere opens a 1-on-1
+  chat; the SuperAdmin triages every thread from the Handle Console inbox and
+  replies as a Staff Handle.
 - **Admin panel** — Users (account minting), Topic groups, and (superadmin)
-  Console + Staff. Bottom nav is just **Community + Account**.
+  Console + Staff. Bottom nav is **Community + Members + Messages + Account**.
 
 ## Security model (do not weaken)
 - Roles in `users/{uid}.role`: member | staff | admin | superadmin.
@@ -62,7 +70,17 @@ explanations simple and step-by-step, and never assume a local terminal.
 - **Staff Handles have NO Auth account**; operated ONLY from the Handle Console
   via `actingAsStaff(uid)` (superadmin + target role == staff).
 - `status/admins` (uids, world-readable to signed-in users) publishes who is an
-  admin; `AdminTag` renders from it; admins self-heal into it on sign-in.
+  admin; admins self-heal into it on sign-in.
+- **`directory/{uid}` is the public mirror of each account's `{handle, role}`**
+  (and `managed` for Staff Handles). Private `users/{uid}` docs are NEVER
+  world-readable (they hold emails, minted passwords, bank fields); the
+  directory is the safe, readable surface that powers the Members list, lets
+  anyone DM anyone, and drives the **Admin / SuperAdmin** tags (`AdminTag`
+  reads the directory via `AuthContext`). The rules PIN a directory entry's
+  role to the real `users/{uid}.role` (via `get()`), so nobody can forge a
+  tag. Every signed-in user self-heals their own entry; admins mirror Staff
+  Handles and run a one-pass `syncAllDirectory()` from the Members screen.
+  **Only the SuperAdmin changes roles** (`setUserRole`, rules `isSuper`).
 - Collections: `broadcast` posts are created by admins/handles, members may only
   change their own key in `reactions`; `broadcast/*/comments` — any active user
   creates their own, author or admin deletes; `groups` — read by active users,
@@ -76,10 +94,10 @@ explanations simple and step-by-step, and never assume a local terminal.
 ## Legacy (present in the repo, NOT part of the product)
 The original Kite PM features still exist in code but are **unlinked from the
 nav and dormant**: rooms, milestones, funding, bank details, forms, compliance
-logs, reports, admin alerts, and member-to-member DMs. DMs are still wired into
-`UserBadge` (tap a handle) and the Handle Console inbox, so they weren't
-deleted. Don't build on these. To remove them fully, delete the routes under
-`src/app/(app)/rooms`, `src/app/(app)/messages`, and
+logs, reports, and admin alerts. (Member-to-member **DMs are now a live
+product feature** — see above — so `src/app/(app)/messages` is NO LONGER
+legacy.) Don't build on the dormant ones. To remove them fully, delete the
+routes under `src/app/(app)/rooms` and
 `src/app/(app)/admin/{milestones,alerts,reports,rooms,forms,logs,dashboard}`,
 their components, and the matching `firestore.rules` blocks.
 

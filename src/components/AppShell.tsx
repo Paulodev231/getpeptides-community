@@ -14,6 +14,8 @@ import OfflineBanner from "@/components/OfflineBanner";
 
 const TABS = [
   { href: "/noticeboard", key: "navNoticeboard", icon: "🏠" },
+  { href: "/members", key: "navMembers", icon: "👥" },
+  { href: "/messages", key: "navMessages", icon: "💬" },
   { href: "/profile", key: "navDashboard", icon: "👤" },
 ] as const;
 
