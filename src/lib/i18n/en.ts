@@ -46,7 +46,7 @@ export const en = {
   // community feed (Quora-style posts + comments)
   qTitlePlaceholder: "Title or question",
   qBodyPlaceholder: "Add more detail (optional)",
-  qImageUrl: "Image link (https://…) — optional",
+  qImageUrl: "Image or video link (https://… — YouTube/Vimeo too) — optional",
   qPost: "Post",
   qPosting: "Posting…",
   qComments: "Comments",
@@ -151,6 +151,7 @@ export const en = {
   send: "Send",
   attachment: "Attachment",
   attachedImage: "Attached image",
+  attachedVideo: "Attached video",
   adminTag: "Admin",
   superAdminTag: "SuperAdmin",
   // members directory

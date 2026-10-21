@@ -2,7 +2,7 @@
 
 // The Quora-style comment thread under a community post. Any active signed-in
 // user may add their own comment; the author or an Admin may delete one.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   addDoc,
   collection,
@@ -19,7 +19,17 @@ import { useT } from "@/context/LanguageContext";
 import { isAdmin, type PostComment } from "@/lib/types";
 import UserBadge from "@/components/UserBadge";
 
-export default function PostComments({ postId }: { postId: string }) {
+export default function PostComments({
+  postId,
+  collapsed = false,
+  onCount,
+}: {
+  postId: string;
+  /** When true, keep listening (so the count stays live) but render nothing. */
+  collapsed?: boolean;
+  /** Reports the live comment count so the toggle can always show it. */
+  onCount?: (n: number) => void;
+}) {
   const { user, profile } = useAuth();
   const { t } = useT();
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -27,15 +37,27 @@ export default function PostComments({ postId }: { postId: string }) {
   const [busy, setBusy] = useState(false);
   const admin = isAdmin(profile?.role);
 
+  // Keep the latest callback without re-subscribing the listener.
+  const onCountRef = useRef(onCount);
+  useEffect(() => {
+    onCountRef.current = onCount;
+  });
+
   useEffect(() => {
     const q = query(
       collection(db(), "broadcast", postId, "comments"),
       orderBy("createdAt", "asc"),
     );
-    return onSnapshot(q, (snap) =>
-      setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PostComment)),
-    );
+    return onSnapshot(q, (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PostComment);
+      setComments(list);
+      onCountRef.current?.(list.length);
+    });
   }, [postId]);
+
+  // Collapsed: the listener above still runs (count stays live), but the
+  // thread itself is hidden.
+  if (collapsed) return null;
 
   async function add() {
     const body = text.trim();
