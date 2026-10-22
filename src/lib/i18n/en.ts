@@ -77,6 +77,10 @@ export const en = {
   // direct messages
   directMessages: "Direct Messages",
   dmsEmpty: "No conversations yet. Open Members and tap anyone to start a private chat.",
+  dmEnableAlerts: "🔔 Turn on alerts for new messages",
+  dmAlertsOn: "✓ Alerts are on",
+  commentAsSelf: "You",
+  commentAsLabel: "Comment as",
   privateConversation: "Private conversation with",
   messageSomeone: "Message",
   dmLoadError:

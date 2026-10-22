@@ -167,6 +167,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Alerts carry their own read flag in Firestore so the Admin can see it.
   const alertUnread = user ? alerts.filter((a) => !a.read).length : 0;
 
+  // Show the unread total in the browser tab, e.g. "(3) GetPeptides Community",
+  // so people notice waiting messages even on another tab.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const total = dmUnread + broadcastUnread + alertUnread;
+    const base = document.title.replace(/^\(\d+\)\s*/, "");
+    document.title = total > 0 ? `(${total}) ${base}` : base;
+  }, [dmUnread, broadcastUnread, alertUnread]);
+
   return (
     <NotificationContext.Provider
       value={{ dmUnread, broadcastUnread, alertUnread, notificationsOn, enableNotifications }}

@@ -230,11 +230,13 @@ service cloud.firestore {
       // OWN comment; the author or an Admin may delete it. No edits.
       match /comments/{commentId} {
         allow read: if isActive();
-        allow create: if isActive()
-          && request.resource.data.authorUid == request.auth.uid
-          && request.resource.data.text is string
+        // Any active user comments as themselves; the SuperAdmin may also
+        // comment AS one of their Managed Staff Handle consultants.
+        allow create: if request.resource.data.text is string
           && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000;
+          && request.resource.data.text.size() <= 2000
+          && ((isActive() && request.resource.data.authorUid == request.auth.uid)
+              || actingAsStaff(request.resource.data.authorUid));
         allow update: if false;
         allow delete: if isAdmin()
           || (isActive() && resource.data.authorUid == request.auth.uid);

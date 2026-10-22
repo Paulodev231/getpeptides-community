@@ -7,6 +7,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useT } from "@/context/LanguageContext";
+import { useNotifications } from "@/context/NotificationContext";
 import type { DmThread } from "@/lib/types";
 import { getSeen, seenKeys } from "@/lib/seen";
 import AppShell from "@/components/AppShell";
@@ -15,6 +16,7 @@ import AdminTag from "@/components/AdminTag";
 export default function MessagesPage() {
   const { user } = useAuth();
   const { t: tr } = useT();
+  const { notificationsOn, enableNotifications } = useNotifications();
   const identityUid = user?.uid ?? "";
   const [threads, setThreads] = useState<DmThread[]>([]);
   const [loadError, setLoadError] = useState(false);
@@ -45,6 +47,17 @@ export default function MessagesPage() {
   return (
     <AppShell title={`💬 ${tr("directMessages")}`}>
       <div className="mx-auto max-w-lg space-y-2 p-3">
+        {!notificationsOn ? (
+          <button
+            type="button"
+            onClick={() => enableNotifications()}
+            className="w-full rounded-xl bg-brand-soft px-3 py-2.5 text-xs font-bold text-brand active:opacity-80"
+          >
+            {tr("dmEnableAlerts")}
+          </button>
+        ) : (
+          <p className="px-1 text-[11px] font-semibold text-brand opacity-70">{tr("dmAlertsOn")}</p>
+        )}
         {loadError && (
           <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-medium text-red-500">
             {tr("dmLoadError")}
