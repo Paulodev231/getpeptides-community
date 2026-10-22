@@ -16,7 +16,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useT } from "@/context/LanguageContext";
-import { isAdmin, type PostComment } from "@/lib/types";
+import { isAdmin, type PostComment, type QuotedMessage } from "@/lib/types";
 import { commentAsHandle } from "@/lib/handleActions";
 import UserBadge from "@/components/UserBadge";
 
@@ -37,6 +37,8 @@ export default function PostComments({
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [asUid, setAsUid] = useState(""); // "" = comment as myself
+  const [replyTo, setReplyTo] = useState<QuotedMessage | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const admin = isAdmin(profile?.role);
   const isSuper = profile?.role === "superadmin";
   // Staff Handle consultants the SuperAdmin can comment as.
@@ -66,6 +68,11 @@ export default function PostComments({
   // thread itself is hidden.
   if (collapsed) return null;
 
+  function startReply(c: PostComment) {
+    setReplyTo({ id: c.id, handle: c.authorHandle, text: c.text.slice(0, 160) });
+    inputRef.current?.focus();
+  }
+
   async function add() {
     const body = text.trim();
     if (!body || !user || !profile || busy) return;
@@ -74,16 +81,24 @@ export default function PostComments({
       const persona = personas.find((p) => p.uid === asUid);
       if (persona) {
         // SuperAdmin commenting as one of their Staff Handle consultants.
-        await commentAsHandle({ uid: persona.uid, handle: persona.handle }, postId, body, user.uid);
+        await commentAsHandle(
+          { uid: persona.uid, handle: persona.handle },
+          postId,
+          body,
+          user.uid,
+          replyTo,
+        );
       } else {
         await addDoc(collection(db(), "broadcast", postId, "comments"), {
           authorUid: user.uid,
           authorHandle: profile.handle,
           text: body,
+          ...(replyTo ? { replyTo } : {}),
           createdAt: serverTimestamp(),
         });
       }
       setText("");
+      setReplyTo(null);
     } finally {
       setBusy(false);
     }
@@ -103,23 +118,45 @@ export default function PostComments({
       ) : (
         <ul className="space-y-2">
           {comments.map((c) => (
-            <li key={c.id} className="rounded-xl bg-background px-3 py-2">
+            <li
+              key={c.id}
+              className={`rounded-xl bg-background px-3 py-2 ${
+                replyTo?.id === c.id ? "ring-2 ring-brand" : ""
+              }`}
+            >
               <div className="flex items-center justify-between gap-2">
                 <UserBadge uid={c.authorUid} handle={c.authorHandle} />
                 <span className="text-[10px] opacity-40">
                   {c.createdAt?.toDate().toLocaleString() ?? ""}
                 </span>
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{c.text}</p>
-              {canDelete(c) && (
-                <button
-                  type="button"
-                  onClick={() => remove(c)}
-                  className="mt-1 text-[11px] font-semibold text-red-500"
-                >
-                  🗑️
-                </button>
+              {c.replyTo && (
+                <div className="mt-1 border-l-2 border-brand/50 bg-brand-soft/40 px-2 py-1 text-[11px] leading-snug">
+                  <span className="font-bold text-brand">{c.replyTo.handle}</span>
+                  <span className="ml-1 opacity-70">{c.replyTo.text}</span>
+                </div>
               )}
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{c.text}</p>
+              <div className="mt-1 flex items-center gap-3">
+                {profile && (
+                  <button
+                    type="button"
+                    onClick={() => startReply(c)}
+                    className="text-[11px] font-semibold text-brand"
+                  >
+                    ↩︎ {t("qReply")}
+                  </button>
+                )}
+                {canDelete(c) && (
+                  <button
+                    type="button"
+                    onClick={() => remove(c)}
+                    className="text-[11px] font-semibold text-red-500"
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -144,8 +181,25 @@ export default function PostComments({
               </select>
             </label>
           )}
+          {replyTo && (
+            <div className="flex items-center gap-2 rounded-xl border-l-2 border-brand bg-brand-soft/40 px-2 py-1.5 text-[11px]">
+              <div className="min-w-0 flex-1 leading-snug">
+                <span className="font-bold text-brand">{t("qReplyingTo", { handle: replyTo.handle })}</span>
+                <span className="ml-1 block truncate opacity-70">{replyTo.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                aria-label={t("qCancelReply")}
+                className="shrink-0 rounded-full px-1.5 font-bold opacity-60"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <textarea
+              ref={inputRef}
               rows={1}
               value={text}
               placeholder={t("qAddComment")}

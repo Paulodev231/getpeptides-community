@@ -31,7 +31,9 @@ explanations simple and step-by-step, and never assume a local terminal.
     Console).
   - Anyone active **reacts** (one emoji each, `reactions` map) and **comments**
     (`broadcast/{id}/comments` — any active user writes their own; author or
-    admin deletes; no edits). See `src/components/PostComments.tsx`.
+    admin deletes; no edits). A comment may **reply to** another (a `replyTo`
+    `QuotedMessage` snapshot of the parent, shown quoted above the reply). See
+    `src/components/PostComments.tsx`.
 - **Topic groups** — collection `groups` (Quora-style spaces). Admins manage
   them on **`/admin/groups`**; the composer files a post under one and the feed
   shows a filter chip row (filtered in JS — see the index rule below).
