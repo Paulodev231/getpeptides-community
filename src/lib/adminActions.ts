@@ -19,6 +19,7 @@ import {
 } from "firebase/firestore";
 import { db, firebaseAuth } from "@/lib/firebase";
 import { logEvent } from "@/lib/log";
+import { upsertDirectoryEntry } from "@/lib/directory";
 import type { Role } from "@/lib/types";
 import { isUsernameTaken, isValidUsername, newLoginEmail, normalizeUsername } from "@/lib/usernames";
 
@@ -126,6 +127,7 @@ export async function createManagedAccount(
     await batch.commit();
     await signOut(getAuth(secondary));
     if (role === "admin") await syncAdminRoster(uid, true);
+    await upsertDirectoryEntry(uid, handle, role, role === "staff" ? true : undefined);
     logEvent(actorUid(), "account_created", { newUid: uid, role });
     return uid;
   } finally {
@@ -174,6 +176,7 @@ export async function createStaffHandle(handle: string): Promise<string> {
     managed: true, // operated by the SuperAdmin, never signs in
     createdAt: serverTimestamp(),
   });
+  await upsertDirectoryEntry(ref.id, handle.trim(), "staff", true);
   logEvent(actorUid(), "staff_handle_created", { uid: ref.id });
   return ref.id;
 }
@@ -220,6 +223,7 @@ export async function createStaffHandles(
 
 export async function renameStaffHandle(uid: string, handle: string) {
   await updateDoc(doc(db(), "users", uid), { handle: handle.trim() });
+  await upsertDirectoryEntry(uid, handle.trim(), "staff", true);
   logEvent(actorUid(), "staff_handle_renamed", { uid });
 }
 
@@ -238,6 +242,10 @@ export async function setUserEmailRecord(uid: string, email: string) {
 export async function setUserRole(uid: string, role: Role) {
   await updateDoc(doc(db(), "users", uid), { role });
   await syncAdminRoster(uid, role === "admin" || role === "superadmin");
+  // Mirror the new role into the public directory so the tag updates at once.
+  const snap = await getDoc(doc(db(), "users", uid)).catch(() => null);
+  const u = snap?.data() as { handle?: string; managed?: boolean } | undefined;
+  if (u?.handle) await upsertDirectoryEntry(uid, u.handle, role, u.managed);
   logEvent(actorUid(), "role_changed", { uid, role });
 }
 

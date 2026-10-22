@@ -9,6 +9,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -17,6 +18,7 @@ import { usePathname } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import {
   arrayUnion,
+  collection,
   deleteDoc,
   doc,
   onSnapshot,
@@ -25,6 +27,7 @@ import {
 } from "firebase/firestore";
 import { db, firebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
 import { isAdmin, type UserProfile } from "@/lib/types";
+import { upsertOwnDirectory, type DirectoryEntry } from "@/lib/directory";
 
 interface AuthState {
   user: User | null;
@@ -37,6 +40,10 @@ interface AuthState {
   profileError: boolean;
   /** Uids of admins, so an "Admin" tag can be shown beside their handle. */
   adminUids: Set<string>;
+  /** Uids of SuperAdmins, shown with a distinct "SuperAdmin" tag. */
+  superAdminUids: Set<string>;
+  /** Public directory (handle + role) of everyone, keyed by uid. */
+  directory: Map<string, DirectoryEntry>;
   logout: () => Promise<void>;
 }
 
@@ -48,6 +55,8 @@ const AuthContext = createContext<AuthState>({
   profileMissing: false,
   profileError: false,
   adminUids: new Set<string>(),
+  superAdminUids: new Set<string>(),
+  directory: new Map<string, DirectoryEntry>(),
   logout: async () => {},
 });
 
@@ -57,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [adminUids, setAdminUids] = useState<Set<string>>(new Set());
+  const [directory, setDirectory] = useState<Map<string, DirectoryEntry>>(new Map());
   const [profileMissing, setProfileMissing] = useState(false);
   const [profileError, setProfileError] = useState(false);
   // When Firebase isn't configured yet there is nothing to wait for.
@@ -118,6 +128,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, [user, profile, adminUids]);
 
+  // The public member directory (handle + role of everyone). This is what lets
+  // members see and DM each other and the Staff Handles — the private user
+  // profiles stay unreadable.
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(
+      collection(db(), "directory"),
+      (snap) => {
+        const map = new Map<string, DirectoryEntry>();
+        snap.forEach((d) => {
+          const data = d.data() as Omit<DirectoryEntry, "uid">;
+          map.set(d.id, { uid: d.id, ...data });
+        });
+        setDirectory(map);
+      },
+      () => {},
+    );
+  }, [user]);
+
+  // Self-heal: mirror my own handle + role into the public directory so other
+  // members can find and message me. Re-runs if my handle or role changes.
+  useEffect(() => {
+    if (!user || !profile) return;
+    const entry = directory.get(user.uid);
+    if (entry && entry.handle === profile.handle && entry.role === profile.role) return;
+    upsertOwnDirectory(user.uid, profile.handle, profile.role, profile.managed);
+  }, [user, profile, directory]);
+
+  // SuperAdmins (distinct tag) and the effective admin set, both derived from
+  // the directory so tags stay correct even for accounts not in status/admins.
+  const superAdminUids = useMemo(() => {
+    const s = new Set<string>();
+    directory.forEach((e, uid) => {
+      if (e.role === "superadmin") s.add(uid);
+    });
+    return s;
+  }, [directory]);
+
+  const effectiveAdminUids = useMemo(() => {
+    const s = new Set<string>(adminUids);
+    directory.forEach((e, uid) => {
+      if (e.role === "admin" || e.role === "superadmin") s.add(uid);
+    });
+    return s;
+  }, [adminUids, directory]);
+
   // Anonymous presence heartbeat: presence/{uid} holds a timestamp and, while
   // a room is open, that room's id — so each room can show its own live count
   // instead of the platform-wide one.
@@ -171,7 +227,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         configured: isFirebaseConfigured,
         profileMissing,
         profileError,
-        adminUids,
+        adminUids: effectiveAdminUids,
+        superAdminUids,
+        directory,
         logout,
       }}
     >

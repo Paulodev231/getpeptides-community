@@ -33,6 +33,7 @@ import AppShell from "@/components/AppShell";
 import MediaAttachment from "@/components/MediaAttachment";
 import UserBadge from "@/components/UserBadge";
 import PostComments from "@/components/PostComments";
+import { storedMediaType } from "@/lib/media";
 
 export default function CommunityPage() {
   const { user, profile } = useAuth();
@@ -59,6 +60,7 @@ export default function CommunityPage() {
 
   // Which posts have their comment thread open
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const q = query(collection(db(), "broadcast"), orderBy("createdAt", "desc"), limit(60));
@@ -95,7 +97,7 @@ export default function CommunityPage() {
         reactions: {},
         pinned: false,
         ...(group ? { groupId: group.id, groupName: group.name } : {}),
-        ...(img ? { mediaUrl: img, mediaType: "image" as const } : {}),
+        ...(img ? { mediaUrl: img, mediaType: storedMediaType(img) } : {}),
         createdAt: serverTimestamp(),
       });
       logEvent(user.uid, "broadcast_post", img ? { media: "image" } : {});
@@ -111,7 +113,7 @@ export default function CommunityPage() {
     setEditingId(p.id);
     setETitle(p.title ?? "");
     setEBody(p.text ?? "");
-    setEImage(p.mediaType === "image" && p.mediaUrl ? p.mediaUrl : "");
+    setEImage(p.mediaUrl ?? "");
   }
 
   async function saveEdit(id: string) {
@@ -120,7 +122,7 @@ export default function CommunityPage() {
       title: eTitle.trim(),
       text: eBody.trim(),
       mediaUrl: img ? img : deleteField(),
-      mediaType: img ? "image" : deleteField(),
+      mediaType: img ? storedMediaType(img) : deleteField(),
       editedAt: serverTimestamp(),
     }).catch(() => {});
     setEditingId(null);
@@ -232,7 +234,9 @@ export default function CommunityPage() {
             const mine = user ? p.reactions?.[user.uid] : undefined;
             const tally = tallyReactions(p.reactions, p.handleReactions);
             const editing = editingId === p.id;
-            const showComments = !!openComments[p.id];
+            // Comments are shown by default so everyone sees the discussion;
+            // the toggle only collapses them.
+            const showComments = openComments[p.id] !== false;
             return (
               <article
                 key={p.id}
@@ -343,12 +347,19 @@ export default function CommunityPage() {
                 {/* Comments */}
                 <button
                   type="button"
-                  onClick={() => setOpenComments((m) => ({ ...m, [p.id]: !m[p.id] }))}
+                  onClick={() => setOpenComments((m) => ({ ...m, [p.id]: !showComments }))}
                   className="mt-2 text-xs font-semibold text-brand"
                 >
-                  💬 {showComments ? t("qHideComments") : t("qComments")}
+                  💬 {commentCounts[p.id] ?? 0}{" "}
+                  {showComments ? t("qHideComments") : t("qComments")}
                 </button>
-                {showComments && <PostComments postId={p.id} />}
+                <PostComments
+                  postId={p.id}
+                  collapsed={!showComments}
+                  onCount={(n) =>
+                    setCommentCounts((c) => (c[p.id] === n ? c : { ...c, [p.id]: n }))
+                  }
+                />
 
                 {/* Admin controls */}
                 {admin && !editing && (

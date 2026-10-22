@@ -177,6 +177,32 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---------- public member directory ----------
+    // A SAFE, public mirror of each account's handle + role (and whether it is
+    // a managed Staff Handle). This is what lets every active user see everyone
+    // — members, admins and Staff Handles alike — and DM any of them, without
+    // ever exposing the private users/{uid} document (emails, passwords, bank).
+    // An entry's role ALWAYS equals the real role in users/{uid}, so nobody can
+    // forge an Admin/SuperAdmin tag they do not actually hold.
+    match /directory/{uid} {
+      allow read: if isActive();
+      allow create, update: if isActive()
+        && request.resource.data.keys().hasOnly(['handle', 'role', 'managed'])
+        && request.resource.data.handle is string
+        && request.resource.data.handle.size() >= 1
+        && request.resource.data.handle.size() <= 24
+        && request.resource.data.role == get(/databases/$(database)/documents/users/$(uid)).data.role
+        && (
+             // You may mirror your OWN profile (handle must match it too)…
+             (request.auth.uid == uid
+               && request.resource.data.handle == get(/databases/$(database)/documents/users/$(uid)).data.handle)
+             // …or an Admin/SuperAdmin may maintain anyone's entry (minting
+             // accounts, Staff Handles, role changes, the one-pass sync).
+             || isAdmin()
+           );
+      allow delete: if isAdmin() || (isActive() && request.auth.uid == uid);
+    }
+
     // ---------- Noticeboard: admins post, members react with one emoji ----------
     match /broadcast/{postId} {
       // A member may change ONLY the `reactions` map, and within it ONLY their
