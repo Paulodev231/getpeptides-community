@@ -41,9 +41,13 @@ export default function PostComments({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const admin = isAdmin(profile?.role);
   const isSuper = profile?.role === "superadmin";
-  // Staff Handle consultants the SuperAdmin can comment as.
+  // Staff Handle consultants the SuperAdmin can comment as. Guard against any
+  // directory entry missing a handle — an unguarded sort there would throw
+  // during render and blank the whole thread for the SuperAdmin only.
   const personas = isSuper
-    ? [...directory.values()].filter((e) => e.role === "staff").sort((a, b) => a.handle.localeCompare(b.handle))
+    ? [...directory.values()]
+        .filter((e) => e.role === "staff" && typeof e.handle === "string" && e.handle.length > 0)
+        .sort((a, b) => a.handle.localeCompare(b.handle))
     : [];
 
   // Keep the latest callback without re-subscribing the listener.
@@ -57,11 +61,15 @@ export default function PostComments({
       collection(db(), "broadcast", postId, "comments"),
       orderBy("createdAt", "asc"),
     );
-    return onSnapshot(q, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PostComment);
-      setComments(list);
-      onCountRef.current?.(list.length);
-    });
+    return onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PostComment);
+        setComments(list);
+        onCountRef.current?.(list.length);
+      },
+      (err) => console.error("Comments listener error", err),
+    );
   }, [postId]);
 
   // Collapsed: the listener above still runs (count stays live), but the
