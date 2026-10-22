@@ -31,9 +31,10 @@ export default function AppShell({
   const router = useRouter();
   const { profile, logout } = useAuth();
   const { t } = useT();
-  const { broadcastUnread } = useNotifications();
+  const { broadcastUnread, dmUnread } = useNotifications();
   const admin = isAdmin(profile?.role);
-  const badgeFor = (href: string) => (href === "/noticeboard" ? broadcastUnread : 0);
+  const badgeFor = (href: string) =>
+    href === "/noticeboard" ? broadcastUnread : href === "/messages" ? dmUnread : 0;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">

@@ -83,8 +83,9 @@ explanations simple and step-by-step, and never assume a local terminal.
   **Only the SuperAdmin changes roles** (`setUserRole`, rules `isSuper`).
 - Collections: `broadcast` posts are created by admins/handles, members may only
   change their own key in `reactions`; `broadcast/*/comments` — any active user
-  creates their own, author or admin deletes; `groups` — read by active users,
-  write by admins.
+  creates their own (and the SuperAdmin may comment AS a Staff Handle via
+  `commentAsHandle`/`actingAsStaff`), author or admin deletes; `groups` — read
+  by active users, write by admins.
 - **Never write a Firestore query that filters on one field and sorts by
   another** — it needs a composite index and fails silently without one. Filter
   in the query or in JS, sort in JS. (The feed loads newest-first and filters by

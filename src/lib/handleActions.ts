@@ -115,6 +115,22 @@ export async function clearHandleReactions(postId: string, handleUid: string) {
   }).catch(() => {});
 }
 
+/** Add a comment under a community post AS a Staff Handle consultant. */
+export async function commentAsHandle(
+  as: HandleIdentity,
+  postId: string,
+  text: string,
+  actorUid: string,
+) {
+  await addDoc(collection(db(), "broadcast", postId, "comments"), {
+    authorUid: as.uid,
+    authorHandle: as.handle,
+    text,
+    createdAt: serverTimestamp(),
+  });
+  logEvent(actorUid, "commented_as_handle", { handleUid: as.uid, postId });
+}
+
 /** Marks a staff thread as triaged so the console badge clears. */
 export async function markThreadTriaged(threadId: string) {
   await updateDoc(doc(db(), "dms", threadId), { staffReadAt: serverTimestamp() }).catch(
