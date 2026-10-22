@@ -138,6 +138,8 @@ export interface PostComment {
   authorUid: string;
   authorHandle: string;
   text: string;
+  /** Set when this comment replies to another comment on the same post. */
+  replyTo?: QuotedMessage;
   createdAt?: Timestamp;
 }
 

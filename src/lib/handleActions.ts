@@ -115,17 +115,20 @@ export async function clearHandleReactions(postId: string, handleUid: string) {
   }).catch(() => {});
 }
 
-/** Add a comment under a community post AS a Staff Handle consultant. */
+/** Add a comment under a community post AS a Staff Handle consultant,
+ *  optionally replying to an existing comment. */
 export async function commentAsHandle(
   as: HandleIdentity,
   postId: string,
   text: string,
   actorUid: string,
+  replyTo?: QuotedMessage | null,
 ) {
   await addDoc(collection(db(), "broadcast", postId, "comments"), {
     authorUid: as.uid,
     authorHandle: as.handle,
     text,
+    ...(replyTo ? { replyTo } : {}),
     createdAt: serverTimestamp(),
   });
   logEvent(actorUid, "commented_as_handle", { handleUid: as.uid, postId });
